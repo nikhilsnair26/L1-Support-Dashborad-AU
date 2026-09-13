@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L1 Support Operations Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4F7FC;
+    --panel:#FFFFFF;
+    --panel-2:#F8FAFE;
+    --line:#DEE6F2;
+    --text:#0F2244;
+    --muted:#5B6B8C;
+    --dim:#93A2BF;
+    --blue:#1857C4;
+    --blue-dark:#0F3D8C;
+    --blue-light:#EAF1FD;
+    --green:#0F9D6B;
+    --amber:#C7830A;
+    --red:#D8433A;
+    --mono:"IBM Plex Mono", ui-monospace, monospace;
+    --sans:"IBM Plex Sans", -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);}
+  body{font-family:var(--sans); display:flex; min-height:100vh; -webkit-font-smoothing:antialiased;}
+
+  #sidebar{
+    width:252px; flex-shrink:0; background:var(--panel); border-right:1px solid var(--line);
+    position:sticky; top:0; height:100vh; overflow-y:auto; display:flex; flex-direction:column;
+  }
+  #sidebar .brand{ padding:22px 20px 16px 20px; border-bottom:1px solid var(--line); }
+  #sidebar .brand .logo{ display:flex; align-items:center; gap:9px; }
+  #sidebar .brand .logo .mark{ width:26px; height:26px; border-radius:6px; background:var(--blue); display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--mono); font-weight:700; font-size:13px; }
+  #sidebar .brand .k{ font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--blue); font-weight:600; }
+  #sidebar .brand .t{ font-size:16px; font-weight:700; margin-top:8px; line-height:1.3; color:var(--text); }
+  #sidebar .brand .s{ font-size:11.5px; color:var(--muted); margin-top:3px; }
+
+  #navlist{ list-style:none; margin:0; padding:10px 0; flex:1; }
+  #navlist button{
+    width:100%; text-align:left; background:none; border:none; color:var(--muted);
+    padding:10px 20px; font-size:13.5px; font-family:var(--sans); cursor:pointer;
+    border-left:3px solid transparent; transition:background 0.12s, color 0.12s;
+  }
+  #navlist button:hover{ background:var(--blue-light); color:var(--text); }
+  #navlist button.active{ background:var(--blue-light); color:var(--blue-dark); border-left:3px solid var(--blue); font-weight:600; }
+
+  #sidebar .foot{ padding:14px 20px 18px 20px; border-top:1px solid var(--line); font-size:10.5px; color:var(--dim); line-height:1.6; font-family:var(--mono); }
+
+  #main{ flex:1; min-width:0; }
+  #topbar{
+    display:flex; align-items:center; justify-content:space-between; padding:20px 36px;
+    border-bottom:1px solid var(--line); position:sticky; top:0; background:rgba(244,247,252,0.92); backdrop-filter:blur(6px); z-index:5;
+  }
+  #topbar h1{ font-size:20px; margin:0; font-weight:700; color:var(--text); }
+  #topbar .sub{ font-size:12.5px; color:var(--muted); margin-top:3px; }
+  #topbar .period{ font-family:var(--mono); font-size:11px; color:var(--blue); background:var(--blue-light); padding:5px 11px; border-radius:3px; white-space:nowrap; }
+
+  #content{ padding:32px 36px 90px 36px; max-width:1400px; }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  h2.pt{ font-size:22px; margin:0 0 6px 0; font-weight:700; }
+  p.desc{ font-size:13px; color:var(--muted); margin:0 0 22px 0; max-width:800px; line-height:1.55; }
+
+  /* Stat cards */
+  .statgrid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1px; background:var(--line); border:1px solid var(--line); margin-bottom:28px; border-radius:8px; overflow:hidden; }
+  .stat{ background:var(--panel); padding:18px 18px 16px 18px; border-top:3px solid var(--dim); }
+  .stat.ok{ border-top-color:var(--green); }
+  .stat.warn{ border-top-color:var(--amber); }
+  .stat.bad{ border-top-color:var(--red); }
+  .stat .label{ font-size:11px; color:var(--muted); margin-bottom:8px; font-weight:600; }
+  .stat .value{ font-family:var(--mono); font-size:25px; font-weight:700; line-height:1; color:var(--text); }
+  .stat .flag{ font-size:11px; margin-top:9px; color:var(--muted); line-height:1.4; }
+
+  .section-sub{ font-size:15px; font-weight:700; margin:26px 0 12px 0; color:var(--text); }
+  .section-note{ font-size:12px; color:var(--muted); margin:-6px 0 14px 0; line-height:1.5; }
+
+  /* Tables */
+  .scroll-x{ overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+  table.grid{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.grid th{
+    background:var(--panel-2); color:var(--blue-dark); text-align:left; font-weight:700; font-size:10.5px;
+    letter-spacing:0.02em; padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  table.grid td{ padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; color:var(--text); }
+  table.grid tr:last-child td{ border-bottom:none; }
+  table.grid tr:hover td{ background:var(--panel-2); }
+  td.num{ font-family:var(--mono); }
+  td.rowlabel{ font-weight:700; white-space:nowrap; }
+
+  .badge{ display:inline-block; padding:3px 10px; border-radius:3px; font-size:10.5px; font-weight:700; font-family:var(--mono); }
+  .badge.Low{ background:rgba(15,157,107,0.12); color:var(--green); }
+  .badge.Medium{ background:rgba(199,131,10,0.12); color:var(--amber); }
+  .badge.High{ background:rgba(216,67,58,0.12); color:var(--red); }
+  .badge.Critical{ background:rgba(216,67,58,0.22); color:var(--red); font-weight:800; }
+
+  /* Key-value blocks */
+  .kv-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  @media (max-width:860px){ .kv-grid{ grid-template-columns:1fr; } }
+  .kv-item{ background:var(--panel); padding:14px 16px; }
+  .kv-item .l{ font-size:11px; color:var(--muted); margin-bottom:5px; font-weight:600; }
+  .kv-item .v{ font-size:13px; line-height:1.5; }
+
+  .plain-list{ margin:0; padding:0; list-style:none; }
+  .plain-list li{ padding:10px 0; border-bottom:1px solid var(--line); font-size:13px; line-height:1.6; }
+  .plain-list li:last-child{ border-bottom:none; }
+  .plain-list b{ color:var(--text); }
+
+  .chartbox{ border:1px solid var(--line); background:var(--panel); padding:18px 20px; margin-bottom:24px; border-radius:8px; }
+  svg text{ font-family:var(--mono); fill:var(--muted); }
+  .legend{ display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; }
+  .legend .li{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); font-family:var(--mono); }
+  .legend .sw{ width:9px; height:9px; border-radius:2px; }
+
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <div class="brand">
+    <div class="logo"><div class="mark">VS</div><div class="k">VOICESTACK</div></div>
+    <div class="t">L1 Support Operations</div>
+    <div class="s">Walkthrough &middot; Jun&ndash;Aug 2026</div>
+  </div>
+  <ul id="navlist"></ul>
+  <div class="foot">VOICESTACK L1 SUPPORT</div>
+</nav>
+
+<div id="main">
+  <div id="topbar">
+    <div>
+      <h1 id="pagetitle">Overview</h1>
+      <div class="sub" id="pagesub"></div>
+    </div>
+    <div class="period">DATA PERIOD: JUN&ndash;AUG 2026</div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+/* ================= DATA (verbatim from L1 Support Operations Walkthrough PDF) ================= */
+
+const KPI_TABLE = [
+  ["Ticket volume", "1,250", "Monitor weekly volume and channel mix; investigate significant volume spikes"],
+  ["SLA compliance", "83.19%", "Day 30 \u226586%; Day 60 \u226588%; Day 90 \u226590%"],
+  ["CSAT", "85.45%", "Day 30 \u226586%; Day 60 \u226590%; Day 90 \u226595%"],
+  ["Reopen rate", "5.09%", "Day 30 \u22645%; Day 60 \u22644.5%; Day 90 \u22644%"],
+  ["Avg first response", "1.60 hr", "Track weekly; improve without compromising quality"],
+  ["Avg resolution", "16.97 hr", "Track weekly; reduce aged/long-running work"],
+  ["Open backlog", "27", "Establish aged-backlog baseline; reduce aged backlog 15% by Day 60 and 30% by Day 90"],
+  ["P1 incidents", "Nil", "Maintain rapid response and documented incident process"],
+  ["P2 incidents", "5", "Track cause, escalation, and resolution trend"],
+];
+
+const WEEKLY_TREND = [
+  ["1", 83, "64.10%", "N/A", "6.02%", "2.5h", "17.3h"],
+  ["2", 107, "61.54%", "N/A", "4.67%", "3.0h", "39.4h"],
+  ["3", 112, "63.64%", "14.29%", "7.14%", "2.7h", "19.5h"],
+  ["4", 124, "80.00%", "N/A", "5.65%", "2.1h", "22.4h"],
+  ["5", 102, "63.41%", "N/A", "4.90%", "0.7h", "11.8h"],
+  ["6", 116, "45.00%", "10.00%", "1.72%", "1.7h", "17.7h"],
+  ["7", 101, "63.16%", "12.50%", "5.94%", "3.2h", "15.3h"],
+  ["8", 117, "59.46%", "10.00%", "3.42%", "1.5h", "12.4h"],
+  ["9", 91, "57.50%", "N/A", "2.56%", "1.2h", "13.4h"],
+  ["10", 103, "76.92%", "N/A", "2.91%", "1.4h", "15.3h"],
+  ["11", 102, "70.97%", "4.55%", "2.94%", "0.2h", "14.1h"],
+  ["12", 92, "85.71%", "N/A", "4.35%", "0.9h", "10.8h"],
+];
+
+const CHANNEL_VOLUME = [
+  ["Email", 421, "33.68%"],
+  ["Voice", 491, "39.28%"],
+  ["WhatsApp", 114, "9.12%"],
+  ["Web", 126, "10.08%"],
+  ["Chat", 98, "7.84%"],
+];
+const CHANNEL_TOTAL = ["Total", 1250, "100%"];
+
+const AGENT_PERF = [
+  {agent:"Advaith", solved:452, chat:"2.3h / 44.3h", email:"1.0h / 33.8h", voice:"7.4h / 17.6h", web:"1.9h / 20.6h", whatsapp:"0.4h / 21.5h", reopen:"3.15%"},
+  {agent:"Elsaba Jojo", solved:410, chat:"0.8h / 14.8h", email:"0.2h / 16.2h", voice:"0.9h / 7.5h", web:"0.4h / 15.3h", whatsapp:"0.0h / 9.0h", reopen:"4.10%"},
+  {agent:"Nikhil S Nair", solved:388, chat:"1.3h / 14.5h", email:"0.8h / 17.6h", voice:"0.8h / 6.1h", web:"0.4h / 16.5h", whatsapp:"0.1h / 4.0h", reopen:"8.84%"},
+];
+const REOPEN_NOTE = "Reopen rate includes tickets moved from Solved \u2192 Pending \u2192 Solved for updates or edits. The team has been informed of this Zendesk behaviour.";
+
+const BACKLOG_AGEING = [
+  ["Advaith", 0, 13, 2, 0],
+  ["Elsaba Jojo", 0, 0, 2, 2],
+  ["Nikhil S Nair", 0, 3, 4, 1],
+];
+
+const PEAK = [
+  {agent:"Advaith", color:"#1857C4", values:[5,27,53,32,41,45,34,46,46,40,21,23,7,7], action:"Prioritise coverage around higher-volume hours"},
+  {agent:"Elsaba Jojo", color:"#0F9D6B", values:[1,10,22,53,64,43,39,44,45,36,27,9,6,2], action:"Stagger breaks/training away from peaks"},
+  {agent:"Nikhil S Nair", color:"#C7830A", values:[4,34,80,52,36,39,28,28,28,25,15,8,3,2,2], action:"Peak window: 04:00\u201310:00"},
+];
+const PEAK_NOTE = "Note:This data includes all tickets created during that time period.";
+const PEAK_ALIGN_NOTE = "Values are plotted in the order listed in the source (2:00\u201315:00 window). Nikhil's list contains 15 readings against a 14-hour window \u2014 shown as given, not reconciled to a specific hour.";
+
+
+const CAPABILITY = [
+  {area:"Porting & number management",
+    responsibility:"L1 intake, eligibility/status checks, number validation, documentation, and escalation of carrier issues",
+    primary:"Advaith", backup:"Nikhil", advaith:"L4", elsaba:"L1", nikhil:"L4",
+    dependency:"No critical single-person dependency. Advaith and Nikhil can independently handle the current L1/L2 scope.",
+    risk:"Low", crossTraining:"Advaith \u2192 Elsaba: Porting intake, status checks, and documentation", target:"Day 60"},
+  {area:"DNI integration",
+    responsibility:"Basic L1 troubleshooting, configuration validation, and escalation of advanced integration issues",
+    primary:"Advaith", backup:"Nikhil", advaith:"L1", elsaba:"L0", nikhil:"L1",
+    dependency:"Partial dependency. Nikhil is the primary resource for DNI troubleshooting, with Advaith as backup. Advanced platform issues may require Nikhil or platform support.",
+    risk:"Medium", crossTraining:"Advaith \u2192Nikhil / Elsaba: DNI L1 troubleshooting and escalation", target:"Day 60"},
+  {area:"Call flows, queues & routing",
+    responsibility:"IVR, queue, routing, and call-flow troubleshooting; escalate complex configuration",
+    primary:"Advaith", backup:"Nikhil", advaith:"L4", elsaba:"L3", nikhil:"L4",
+    dependency:"No single-person dependency. Advaith and Nikhil have advanced capability, with Elsaba handling basic routing/queue work.",
+    risk:"Medium", crossTraining:"Advaith \u2192 Elsaba: To independently handle standard call-flow/routing issues by Day 60.", target:"Day 60"},
+  {area:"Carrier & Twilio troubleshooting",
+    responsibility:"Failed-call/SMS triage, basic diagnostics, evidence collection, and escalation",
+    primary:"Nikhil", backup:"Advaith", advaith:"L4", elsaba:"L2", nikhil:"L4",
+    dependency:"Partial dependency. Nikhil is the primary SME, and Advaith is the backup for advanced troubleshooting. Carrier access/escalation remains an external dependency.",
+    risk:"High", crossTraining:"Nikhil \u2192 Elsaba: Failed-call/SMS investigation, basic carrier/Twilio diagnostics, log/evidence collection and escalation requirements.", target:"Day 90"},
+  {area:"Device provisioning & troubleshooting",
+    responsibility:"Device setup, provisioning checks and standard troubleshooting",
+    primary:"Nikhil", backup:"Advaith", advaith:"L4", elsaba:"L4", nikhil:"L4",
+    dependency:"No single-person dependency. All three team members have independent capability.",
+    risk:"Low", crossTraining:"Maintain 3-person capability through case rotation", target:"Day 30"},
+  {area:"PMS & other integrations",
+    responsibility:"Basic L1 triage, information gathering, and escalation of advanced integration issues",
+    primary:"Advaith", backup:"Nikhil", advaith:"L4", elsaba:"L0", nikhil:"L3",
+    dependency:"Advanced dependency. Advaith is the primary owner, and Nikhil is the backup for advanced PMS/integration work.",
+    risk:"High", crossTraining:"Advaith \u2192 Elsaba: Train on integration intake, basic PMS troubleshooting, information gathering, and identifying when advanced technical escalation is required. Nikhil to act as advanced backup.", target:"Day 90"},
+  {area:"Texting & compliance",
+    responsibility:"Basic texting troubleshooting, consent/opt-out checks, and escalation of compliance/provider issues",
+    primary:"Nikhil", backup:"Advaith", advaith:"L3", elsaba:"L1", nikhil:"L3",
+    dependency:"Partial dependency. Basic texting support has multiple-person coverage, while compliance/provider-related issues depend on Nikhil/Advaith and provider processes.",
+    risk:"Medium", crossTraining:"Nikhil \u2192 Elsaba: Train on texting configuration, consent/opt-out checks, restrictions, common messaging issues, and escalation to provider/compliance teams.", target:"Day 60"},
+  {area:"Incident & outage management",
+    responsibility:"Detection, initial triage, customer communication and escalation; support incident process",
+    primary:"Nikhil", backup:"Advaith", advaith:"L3", elsaba:"L1", nikhil:"L3",
+    dependency:"Advanced dependency. Nikhil and Advaith currently provide advanced incident capability; complex incidents may require one of these senior resources.",
+    risk:"High", crossTraining:"Nikhil/Advaith \u2192 Elsaba: Train on incident detection, severity assessment, incident checklist, customer communication, evidence collection, and escalation process.", target:"Day 90"},
+  {area:"Billing & configuration",
+    responsibility:"Standard billing/configuration requests, validation and approval-based escalation",
+    primary:"Advaith", backup:"Nikhil", advaith:"L3", elsaba:"L2", nikhil:"L3",
+    dependency:"No critical single-person dependency. Advaith and Nikhil can handle normal cases; approval/access may require an authorised resource.",
+    risk:"Low", crossTraining:"Maintain backup and document approvals", target:"Day 60"},
+];
+
+const SCORECARD = [
+  ["SLA compliance", "83.19%", "\u226585%", "\u226590%", "\u226595%", "Support Lead"],
+  ["CSAT", "85.45%", "\u226585.5%", "\u226587%", "\u226590%", "Support Lead"],
+  ["Reopen rate", "5.09%", "\u22645.0%", "\u22644.5%", "\u22644.0%", "Support Lead / Team"],
+  ["Aged backlog", "27 tickets", "\u22648", "15% reduction", "30% reduction", "Support Lead"],
+  ["DNI independent coverage", "2/3", "2/3", "3/3", "3/3 maintained", "Support Lead"],
+  ["Critical process documentation", "Gap assessment", "Top 2 processes documented", "Top 4 documented", "All critical processes documented", "Support Lead"],
+  ["Cross-training", "Current matrix", "2 capability plans active", "4 capability areas with backup", "100% critical areas backed up", "Support Lead"],
+  ["WhatsApp leakage", "16", "<1%", "<1%", "0%", "Support Lead"],
+  ["Weekly leadership reporting", "Not formalised", "Metrics defined", "Weekly reporting active", "100% scheduled reports delivered", "Support Lead"],
+];
+
+const ROTA_BLOCKS = [
+  ["02:00\u201304:00", "Advaith / Nikhil", "Eldho", "Nikhil", "On-call/available team resource"],
+  ["04:00\u201306:00", "Advaith / Nikhil / Elsaba", "Eldho", "Advaith", "On-call/available team resource"],
+  ["06:00\u201308:00", "Elsaba / Nikhil", "Advaith", "Elsaba", "On-call/available team resource"],
+  ["08:00\u201310:00", "Advaith / Elsaba", "Nikhil", "Elsaba", "On-call/available team resource"],
+  ["10:00\u201312:00", "Nikhil / Elsaba", "Advaith", "Advaith", "On-call/available team resource"],
+  ["12:00\u201314:00", "Elsaba / Nikhil", "Eldho", "Nikhil", "On-call/available team resource"],
+];
+
+const SCENARIOS = [
+  ["Planned leave", "Handover of priority/open tickets and pending customer actions; primary owner transfers to named backup before leave."],
+  ["Unplanned sick leave", "Activate named backup; redistribute by priority; P1/P2 and SLA-at-risk tickets take precedence."],
+  ["Breaks/training", "Stagger breaks/training; maintain a minimum of two agents live during business hours."],
+  ["Unexpected absence", "Activate backup, redistribute active tickets, prioritise P1/P2 and SLA-at-risk work."],
+  ["Volume spike", "Prioritise live channels and higher-priority work; pause/defer non-urgent work where required."],
+  ["P1 incident", "Assess severity \u2192 acknowledge/notify affected customers within 30 min \u2192 pull in L2/Engineering as required \u2192 resolve \u2192 document learning."],
+];
+
+const WHATSAPP = [
+  ["Cutover date", "October Last"],
+  ["Customer communication", "Confirm all active WhatsApp customers are notified; send final notice with Zendesk contact path before cutover."],
+  ["Redirection", "After cutover, WhatsApp is no longer treated as a normal support channel. If technically supported, redirects manually."],
+  ["Zendesk entry point", "Any transition/exception request is logged in Zendesk the same day with owner and customer context."],
+  ["Exception owner", "Support Lead"],
+  ["Monitoring", "Track every WhatsApp request after cutover and follow up until the customer is successfully transitioned."],
+  ["Leakage target", "0%"],
+  ["Exception expiry", "Proposed: Last of October 2026, subject to confirmation; after expiry, no support request remains outside Zendesk. MID till the Google Ads issue gets fixed."],
+  ["Escalation owner", "Support Lead"],
+];
+
+const SLA_ROWS = [
+  ["P1", "Service down / multiple customers blocked", "15 min", "Every 30 min until resolved", "Immediate", "L1 \u2192 L2 \u2192 Engineering \u2192 CSM/Leadership"],
+  ["P2", "Major feature broken/single customer fully blocked", "15 min", "Same day / every 2 hr", "If unresolved or customer remains blocked", "L1 \u2192 L2 \u2192 Product/Engineering; CSM if impact continues"],
+  ["P3", "Standard query / non-blocking bug", "15 min", "Once a week", "If SLA at risk/breached", "L1 \u2192 L2 \u2192 Product/Engineering if technical dependency"],
+  ["P4", "How-to / minor issue", "15 min", "3 business days", "If SLA at risk/breached", "L1 \u2192 L2 if required; Product/Engineering only with confirmed dependency"],
+];
+
+const ESCALATION_RULES = [
+  "Every escalation must include owner, reason, ticket/incident details, troubleshooting completed, customer impact and next action.",
+  "The receiving team owns the technical dependency until resolved or formally handed back.",
+  "L1 remains accountable for customer communication unless ownership is formally transferred.",
+  "Any ticket approaching or exceeding SLA receives a proactive, specific status update even when there is no confirmed fix.",
+  "Escalation path: L1 \u2192 L2 \u2192 Product / Engineering \u2192 Leadership as required.",
+  "All relevant issue details should be communicated to the CSM.",
+];
+
+const VALIDATION = [
+  {member:"Advaith", capability:"First Response / Ticket Handling", rating:"L3", evidence:"4-ticket sample: 3242, 4623, 3410, 4191", validation:"Independent review by Nikhil or another team reviewer"},
+  {member:"Elsaba Jojo", capability:"First Response / Ticket Handling", rating:"L3", evidence:"4-ticket sample: 4182, 4535, 3302, 4111", validation:"Independent review by Nikhil or another team reviewer"},
+  {member:"Nikhil S Nair", capability:"First Response / Ticket Handling", rating:"L3", evidence:"4-ticket sample: 3710, 4606, 4264, 3476", validation:"Independent review by Eldho or another team reviewer"},
+];
+
+const SECTIONS = [
+  {id:"overview", name:"Overview"},
+  {id:"trend", name:"Weekly Trend (12wk)"},
+  {id:"capability", name:"Capability Matrix"},
+  {id:"scorecard", name:"30-60-90 Scorecard"},
+  {id:"rota", name:"Rota & Coverage"},
+  {id:"whatsapp", name:"WhatsApp Cutover"},
+  {id:"sla", name:"SLA & Escalation"},
+  {id:"validation", name:"Team Validation"},
+  {id:"agentperf", name:"Agent Performance"},
+];
+const SUBTITLES = {
+  overview: "Section 1 \u2014 8\u201312 week operational dashboard.",
+  trend: "Full 12-week trend behind the baseline numbers.",
+  capability: "Section 2 \u2014 functional capability & ownership matrix.",
+  scorecard: "Section 3 \u2014 measurable 30-60-90 day scorecard.",
+  rota: "Section 4 \u2014 rota & coverage model.",
+  whatsapp: "Section 5 \u2014 WhatsApp \u2192 Zendesk cutover.",
+  sla: "Section 6 \u2014 SLA & escalation framework.",
+  validation: "Section 7 \u2014 independent team assessment validation.",
+  agentperf: "Section 1 \u2014 channel volume, agent performance, backlog ageing, peak hours.",
+};
+
+/* ================= HELPERS ================= */
+function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+function esc(s){ return (s==null?"":String(s)); }
+function td(text, cls){ return el("td",cls,esc(text)); }
+function riskBadge(level){ return `<span class="badge ${level}">${level}</span>`; }
+function table(headers, rows){
+  const wrap = el("div","scroll-x");
+  const t = el("table","grid");
+  const thead = el("thead");
+  const htr = el("tr");
+  headers.forEach(h=>htr.appendChild(el("th",null,h)));
+  thead.appendChild(htr); t.appendChild(thead);
+  const tbody = el("tbody");
+  rows.forEach(r=>tbody.appendChild(r));
+  t.appendChild(tbody);
+  wrap.appendChild(t);
+  return wrap;
+}
+
+/* ================= RENDERERS ================= */
+
+function renderOverview(panel){
+  panel.appendChild(el("h2","pt","8\u201312 Week Operational Dashboard"));
+  panel.appendChild(el("p","desc","VoiceStack L1 Support \u2014 data period Jun\u2013Aug 2026. Baseline figures against the Day 30/60/90 walkthrough targets."));
+
+  const grid = el("div","statgrid");
+  KPI_TABLE.forEach(([label,val,target])=>{
+    const card = el("div","stat");
+    card.appendChild(el("div","label",label));
+    card.appendChild(el("div","value",val));
+    card.appendChild(el("div","flag",target));
+    grid.appendChild(card);
+  });
+  panel.appendChild(grid);
+
+  panel.appendChild(el("div","section-sub","12-week trend \u2014 SLA % and Reopen %"));
+  panel.appendChild(lineChartPct(WEEKLY_TREND.map(r=>r[0]), [
+    {name:"SLA %", color:"#1857C4", values: WEEKLY_TREND.map(r=>parseFloat(r[2]))},
+    {name:"Reopen %", color:"#D8433A", values: WEEKLY_TREND.map(r=>parseFloat(r[4]))},
+  ]));
+
+  panel.appendChild(el("div","section-sub","12-week trend \u2014 ticket volume"));
+  panel.appendChild(barChartVertGeneric(WEEKLY_TREND.map(r=>({label:r[0].replace("Week ","W"), value:r[1]})), "#1857C4"));
+
+  panel.appendChild(el("div","section-sub","Channel volume (classified)"));
+  panel.appendChild(barChartHoriz(CHANNEL_VOLUME.map(r=>({label:r[0], value:r[1], sub:r[2]})), `Classified total: ${CHANNEL_TOTAL[1].toLocaleString()} (${CHANNEL_TOTAL[2]})`));
+}
+
+function renderTrend(panel){
+  panel.appendChild(el("h2","pt","Weekly Operational Trend \u2014 12 Weeks"));
+  panel.appendChild(el("p","desc","Underlying weekly data behind the Jun\u2013Aug baseline."));
+  const rows = WEEKLY_TREND.map(r=>{
+    const tr = el("tr");
+    tr.appendChild(td(r[0],"rowlabel"));
+    tr.appendChild(el("td","num",r[1]));
+    tr.appendChild(el("td","num",r[2]));
+    tr.appendChild(el("td","num",r[3]));
+    tr.appendChild(el("td","num",r[4]));
+    tr.appendChild(el("td","num",r[5]));
+    tr.appendChild(el("td","num",r[6]));
+    return tr;
+  });
+  panel.appendChild(table(["Week","Tickets","SLA %","CSAT %","Reopen %","Avg FRT","Avg Resolution"], rows));
+}
+
+function renderCapability(panel){
+  panel.appendChild(el("h2","pt","Functional Capability & Ownership Matrix"));
+  panel.appendChild(el("p","desc","Scale: L0 No exposure \u00b7 L1 Basic/supervised \u00b7 L2 Working knowledge \u00b7 L3 Independent \u00b7 L4 SME/coaches others"));
+  const rows = CAPABILITY.map(r=>{
+    const tr = el("tr");
+    tr.appendChild(td(r.area,"rowlabel"));
+    tr.appendChild(td(r.responsibility));
+    tr.appendChild(td(r.primary));
+    tr.appendChild(td(r.backup));
+    tr.appendChild(el("td","num",r.advaith));
+    tr.appendChild(el("td","num",r.elsaba));
+    tr.appendChild(el("td","num",r.nikhil));
+    tr.appendChild(td(r.dependency));
+    tr.appendChild(el("td",null, riskBadge(r.risk)));
+    tr.appendChild(td(r.crossTraining));
+    tr.appendChild(td(r.target,"num"));
+    return tr;
+  });
+  panel.appendChild(table(["Capability","L1 Responsibility","Primary","Backup","Advaith","Elsaba","Nikhil","Single-person dependency","Risk","Cross-training plan","Target"], rows));
+}
+
+function renderScorecard(panel){
+  panel.appendChild(el("h2","pt","Measurable 30\u201360\u201390 Day Scorecard"));
+  const rows = SCORECARD.map(r=>{
+    const tr = el("tr");
+    tr.appendChild(td(r[0],"rowlabel"));
+    tr.appendChild(td(r[1]));
+    tr.appendChild(td(r[2]));
+    tr.appendChild(td(r[3]));
+    tr.appendChild(td(r[4]));
+    tr.appendChild(td(r[5]));
+    return tr;
+  });
+  panel.appendChild(table(["KPI","Baseline","Day 30","Day 60","Day 90","Owner"], rows));
+}
+
+function renderRota(panel){
+  panel.appendChild(el("h2","pt","Rota & Coverage Model"));
+  panel.appendChild(el("div","section-sub","Coverage rota"));
+  const rows = ROTA_BLOCKS.map(r=>{
+    const tr = el("tr");
+    tr.appendChild(td(r[0],"rowlabel"));
+    tr.appendChild(td(r[1])); tr.appendChild(td(r[2])); tr.appendChild(td(r[3])); tr.appendChild(td(r[4]));
+    return tr;
+  });
+  panel.appendChild(table(["Time","L1 Primary","L1 Secondary","Break coverage","P1 backup"], rows));
+
+  panel.appendChild(el("div","section-sub","Scenario \u2014 operational response"));
+  const rows2 = SCENARIOS.map(s=>{
+    const tr = el("tr");
+    tr.appendChild(td(s[0],"rowlabel"));
+    tr.appendChild(td(s[1]));
+    return tr;
+  });
+  panel.appendChild(table(["Scenario","Operational response"], rows2));
+}
+
+function renderWhatsapp(panel){
+  panel.appendChild(el("h2","pt","WhatsApp \u2192 Zendesk Cutover"));
+  const grid = el("div","kv-grid");
+  WHATSAPP.forEach(([label,val])=>{
+    const item = el("div","kv-item");
+    item.appendChild(el("div","l",label));
+    item.appendChild(el("div","v",val));
+    grid.appendChild(item);
+  });
+  panel.appendChild(grid);
+}
+
+function renderSla(panel){
+  panel.appendChild(el("h2","pt","SLA & Escalation Framework"));
+  const rows = SLA_ROWS.map(r=>{
+    const tr = el("tr");
+    tr.appendChild(td(r[0],"rowlabel"));
+    tr.appendChild(td(r[1])); tr.appendChild(td(r[2])); tr.appendChild(td(r[3])); tr.appendChild(td(r[4])); tr.appendChild(td(r[5]));
+    return tr;
+  });
+  panel.appendChild(table(["Priority","Example","First response","Update cadence","Escalate","Owner/path"], rows));
+
+  panel.appendChild(el("div","section-sub","Escalation & dependency rules"));
+  const list = el("ul","plain-list");
+  ESCALATION_RULES.forEach(n=>list.appendChild(el("li",null,n)));
+  panel.appendChild(list);
+}
+
+function renderValidation(panel){
+  panel.appendChild(el("h2","pt","Independent Team Assessment Validation"));
+  const rows = VALIDATION.map(v=>{
+    const tr = el("tr");
+    tr.appendChild(td(v.member,"rowlabel"));
+    tr.appendChild(td(v.capability));
+    tr.appendChild(td(v.rating,"num"));
+    tr.appendChild(td(v.evidence));
+    tr.appendChild(td(v.validation));
+    return tr;
+  });
+  panel.appendChild(table(["Team member","Capability","Current rating","Evidence","Validation required"], rows));
+}
+
+function renderAgentPerf(panel){
+  panel.appendChild(el("h2","pt","Agent Performance"));
+
+  panel.appendChild(el("div","section-sub","Solved & channel FRT / resolution"));
+  panel.appendChild(table(
+    ["Agent","Solved","Chat FRT/Res.","Email FRT/Res.","Voice FRT/Res.","Web FRT/Res.","WhatsApp FRT/Res.","Reopen rate"],
+    AGENT_PERF.map(r=>{ const tr=el("tr");
+      tr.appendChild(td(r.agent,"rowlabel"));
+      tr.appendChild(el("td","num",r.solved));
+      tr.appendChild(td(r.chat)); tr.appendChild(td(r.email)); tr.appendChild(td(r.voice)); tr.appendChild(td(r.web)); tr.appendChild(td(r.whatsapp));
+      tr.appendChild(el("td","num",r.reopen));
+      return tr; })
+  ));
+  panel.appendChild(el("p","section-note",REOPEN_NOTE));
+
+  panel.appendChild(el("div","section-sub","Backlog ageing"));
+  panel.appendChild(table(
+    ["Assignee","\u22641 day","1\u20137 days","7\u201330 days",">30 days"],
+    BACKLOG_AGEING.map(r=>{ const tr=el("tr");
+      tr.appendChild(td(r[0],"rowlabel"));
+      tr.appendChild(el("td","num",r[1])); tr.appendChild(el("td","num",r[2])); tr.appendChild(el("td","num",r[3])); tr.appendChild(el("td","num",r[4]));
+      return tr; })
+  ));
+
+  panel.appendChild(el("div","section-sub","Peak hours"));
+  panel.appendChild(lineChartIndexed(PEAK));
+  panel.appendChild(el("p","section-note", PEAK_ALIGN_NOTE));
+  panel.appendChild(table(
+    ["Agent","Peak ticket counts (2:00\u201315:00 window, as listed)","Operational action"],
+    PEAK.map(s=>{ const tr=el("tr");
+      tr.appendChild(td(s.agent,"rowlabel"));
+      tr.appendChild(el("td","num", s.values.join(", ")));
+      tr.appendChild(td(s.action));
+      return tr; })
+  ));
+  panel.appendChild(el("p","section-note", PEAK_NOTE));
+}
+
+/* ================= CHARTS (inline SVG) ================= */
+function barChartHoriz(items, note){
+  const box = el("div","chartbox");
+  const max = Math.max(...items.map(i=>i.value));
+  const w = 900, rowH = 34, padTop=10, padLeft=90, chartW = w - padLeft - 90;
+  const h = padTop*2 + rowH*items.length;
+  let svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  items.forEach((it,i)=>{
+    const y = padTop + i*rowH;
+    const bw = (it.value/max) * chartW;
+    svg += `<text x="${padLeft-10}" y="${y+rowH/2+4}" text-anchor="end" font-size="12">${it.label}</text>`;
+    svg += `<rect x="${padLeft}" y="${y+6}" width="${chartW}" height="${rowH-14}" fill="#EAF1FD"/>`;
+    svg += `<rect x="${padLeft}" y="${y+6}" width="${bw}" height="${rowH-14}" fill="#1857C4"/>`;
+    svg += `<text x="${padLeft+bw+8}" y="${y+rowH/2+4}" font-size="12" fill="#0F2244">${it.value.toLocaleString()} (${it.sub})</text>`;
+  });
+  svg += `</svg>`;
+  box.innerHTML = svg;
+  if(note) box.appendChild(el("div","section-note",note));
+  return box;
+}
+
+function barChartVertGeneric(items, color){
+  const box = el("div","chartbox");
+  const max = Math.max(...items.map(i=>i.value));
+  const w = 900, h = 200, padBottom=28, padTop=20, gap=10;
+  const chartH = h - padBottom - padTop;
+  const barW = (w - gap*(items.length-1)) / items.length;
+  let svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  items.forEach((it,i)=>{
+    const x = i*(barW+gap);
+    const bh = (it.value/max) * chartH;
+    const y = padTop + (chartH - bh);
+    svg += `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${color}"/>`;
+    svg += `<text x="${x+barW/2}" y="${y-6}" text-anchor="middle" font-size="10.5" fill="#0F2244">${it.value}</text>`;
+    svg += `<text x="${x+barW/2}" y="${h-10}" text-anchor="middle" font-size="10">${it.label}</text>`;
+  });
+  svg += `</svg>`;
+  box.innerHTML = svg;
+  return box;
+}
+
+function lineChartPct(labels, series){
+  const box = el("div","chartbox");
+  const w = 900, h = 240, padL=40, padR=16, padT=16, padB=30;
+  const chartW = w-padL-padR, chartH = h-padT-padB;
+  const allVals = series.flatMap(s=>s.values);
+  const max = Math.max(...allVals, 10);
+  const stepX = chartW/(labels.length-1);
+  let svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  for(let g=0; g<=4; g++){
+    const y = padT + chartH - (g/4)*chartH;
+    svg += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#EAF1FD" stroke-width="1"/>`;
+    svg += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="10">${Math.round((g/4)*max)}%</text>`;
+  }
+  labels.forEach((lb,i)=>{
+    const x = padL + i*stepX;
+    svg += `<text x="${x}" y="${h-10}" text-anchor="middle" font-size="9.5">${lb.replace("Week ","W")}</text>`;
+  });
+  series.forEach(s=>{
+    const pts = s.values.map((v,i)=>[padL+i*stepX, padT+chartH-(v/max)*chartH]);
+    const pathD = pts.map((p,i)=> (i===0?"M":"L")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+    svg += `<path d="${pathD}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+    pts.forEach(p=>{ svg += `<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="${s.color}"/>`; });
+  });
+  svg += `</svg>`;
+  box.innerHTML = svg;
+  const legend = el("div","legend");
+  series.forEach(s=>{
+    const li = el("div","li");
+    li.innerHTML = `<span class="sw" style="background:${s.color}"></span>${s.name}`;
+    legend.appendChild(li);
+  });
+  box.appendChild(legend);
+  return box;
+}
+
+function lineChartIndexed(series){
+  const box = el("div","chartbox");
+  const w = 900, h = 260, padL=36, padR=16, padT=16, padB=30;
+  const chartW = w-padL-padR, chartH = h-padT-padB;
+  const maxLen = Math.max(...series.map(s=>s.values.length));
+  const allVals = series.flatMap(s=>s.values).filter(v=>v!=null);
+  const max = Math.max(...allVals);
+  const stepX = chartW/(maxLen-1);
+  let svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  for(let g=0; g<=4; g++){
+    const y = padT + chartH - (g/4)*chartH;
+    svg += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#EAF1FD" stroke-width="1"/>`;
+    svg += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="10">${Math.round((g/4)*max)}</text>`;
+  }
+  for(let i=0;i<maxLen;i++){
+    const x = padL + i*stepX;
+    svg += `<text x="${x}" y="${h-10}" text-anchor="middle" font-size="10">${i+1}</text>`;
+  }
+  series.forEach(s=>{
+    const pts = s.values.map((v,i)=>[padL+i*stepX, padT+chartH-(v/max)*chartH]);
+    const pathD = pts.map((p,i)=> (i===0?"M":"L")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+    svg += `<path d="${pathD}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+    pts.forEach(p=>{ svg += `<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="${s.color}"/>`; });
+  });
+  svg += `</svg>`;
+  box.innerHTML = svg;
+  const legend = el("div","legend");
+  series.forEach(s=>{
+    const li = el("div","li");
+    li.innerHTML = `<span class="sw" style="background:${s.color}"></span>${s.agent}`;
+    legend.appendChild(li);
+  });
+  box.appendChild(legend);
+  return box;
+}
+
+/* ================= NAV ================= */
+const RENDERERS = {
+  overview: renderOverview, trend: renderTrend, capability: renderCapability,
+  scorecard: renderScorecard, rota: renderRota, whatsapp: renderWhatsapp, sla: renderSla,
+  validation: renderValidation, agentperf: renderAgentPerf,
+};
+
+function renderNav(){
+  const ul = document.getElementById("navlist");
+  SECTIONS.forEach(s=>{
+    const li = el("li");
+    const btn = el("button", null, s.name);
+    btn.dataset.id = s.id;
+    btn.onclick = ()=>showPanel(s.id);
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+}
+
+function showPanel(id){
+  document.querySelectorAll("#navlist button").forEach(b=>b.classList.toggle("active", b.dataset.id===id));
+  const s = SECTIONS.find(x=>x.id===id);
+  document.getElementById("pagetitle").textContent = s.name;
+  document.getElementById("pagesub").textContent = SUBTITLES[id] || "";
+  const content = document.getElementById("content");
+  content.innerHTML = "";
+  const panel = el("div","panel active");
+  content.appendChild(panel);
+  RENDERERS[id](panel);
+  location.hash = id;
+}
+
+renderNav();
+showPanel((location.hash||"").replace("#","") || "overview");
+</script>
+</body>
+</html>
